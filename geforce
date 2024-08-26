@@ -1,0 +1,288 @@
+"""GeForceNow (Ghostrunner 2 demo) Traffic Generation Module."""
+import subprocess
+import pydirectinput
+import pyautogui
+import time
+import pyperclip
+import json
+import os
+import signal
+from tee.configs import ConfigManager
+from tee.framework.core.setup import Setup
+from tee.framework.core import reporting as rp
+from tee.framework.helpers.traffic_generation import TrafficGenerator
+import tee
+
+
+class GeForceNowApp(TrafficGenerator):
+    """GeForceNow Application Traffic Generator Class.
+
+    Attributes:
+        setup (Setup): Setup environment.
+        play_duration (int): Duration to play the game in minutes.
+        pid (int): Process ID of the GeForce Now application.
+        configs_path (str): Path to configuration files.
+        configs (dict): Configuration data loaded from config files.
+        image_paths (dict): Paths to image assets.
+    """
+
+    def __init__(self, setup: Setup) -> None:
+        """Initialize GeForceNowApp with setup environment.
+
+        Args:
+            setup (Setup): Setup environment.
+        """
+        super().__init__(setup)
+        self.play_duration = None
+        self.pid = None
+
+        self.configs_path = os.path.join(os.path.dirname(tee.__file__),
+                                         "configs",
+                                         "traffic_generation",
+                                         "geforcenow"
+                                         )
+        self.configs = ConfigManager.get_config(
+            "geforcenow", "traffic_generation", "geforcenow"
+        )
+        rp.debug("Configs for GeForce Now are loaded")
+
+        try:
+            with open(self.get_path("images", "json")) as f:
+                self.image_paths = json.load(f)["images"]
+        except Exception as e:
+            rp.debug(f"Error loading image paths: {e}")
+            self.image_paths = {}
+
+    def get_path(self, section: str, key: str) -> str:
+        """Get the path from the configurations with appended type.
+
+        Args:
+            section (str): The section in the configurations.
+            key (str): The key to access the specific value.
+
+        Returns:
+            str: The path value with appended type.
+        """
+        try:
+            path_relative = self.configs[section][key]["path"]
+            type_ = self.configs[section][key]["type"]
+            return os.path.join(self.configs_path, f"{path_relative}.{type_}")
+        except KeyError:
+            rp.debug(f"Path not found for section: {section}, key: {key}")
+            return None
+
+    def start_traffic(self, **kwargs) -> bool:
+        """Starts generating traffic on GeForceNow.
+
+        Args:
+            kwargs (dict, optional): Additional keyword arguments.
+
+        Returns:
+            bool: Start traffic result.
+        """
+        rp.debug("Starting traffic generation on GeForceNow.")
+
+        self.play_duration = kwargs.get('play_duration', 10)
+
+        if not self.open_geforce_now():
+            return False
+
+        time.sleep(10)
+        if not self.click_image("join_button"):
+            return False
+        time.sleep(5)
+
+        if not self.fill_login_form():
+            return False
+        time.sleep(2)
+
+        if not self.submit_form():
+            return False
+
+        if not self.perform_search():
+            return False
+
+        if not self.press_wasd_multiple_times():
+            return False
+
+        return True
+
+    def stop_traffic(self) -> bool:
+        """Stops Traffic."""
+        return self.close_geforce_now()
+
+    def open_geforce_now(self) -> bool:
+        """Opens the GeForce Now application and stores the PID."""
+        application_path = r"C:\Users\Esra Çetin\AppData\Local\NVIDIA Corporation\GeForceNOW\CEF\GeForceNOW.exe"
+
+        try:
+            rp.debug(f"Opening application: {application_path}")
+            process = subprocess.Popen([application_path])
+            self.pid = process.pid
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while opening the application: {e}")
+            return False
+
+    def click_image(self, image_key: str, double_click: bool = False) -> bool:
+        """Finds the image and performs a click action."""
+        try:
+            image_path = self.image_paths.get(image_key, {}).get("path")
+            if image_path is None:
+                rp.debug(f"Image path for {image_key} not found.")
+                return False
+
+            image_location = pyautogui.locateOnScreen(
+                image=image_path, minSearchTime=30, confidence=0.88)
+            if image_location is not None:
+                coords = pyautogui.center(image_location)
+                if double_click:
+                    pyautogui.doubleClick(coords)
+                else:
+                    pyautogui.click(coords)
+                rp.debug(f"{image_key} image clicked.")
+                return True
+            else:
+                rp.debug(f"{image_key} image not found.")
+                return False
+        except Exception as e:
+            rp.debug(f"Error occurred during {image_key} operation: {e}")
+            return False
+
+    def fill_login_form(self) -> bool:
+        """Enters the username and password into the form using coordinates."""
+        try:
+            pyautogui.doubleClick(423, 504)
+            pyautogui.write("mail")
+            pyautogui.hotkey('ctrl', 'alt', 'q')
+            pyautogui.write("airties.com")
+            time.sleep(2)
+            pyautogui.doubleClick(289, 598)
+            password = "password1"
+            pyperclip.copy(password)
+            pyautogui.hotkey('ctrl', 'v')
+            rp.debug("Login form filled successfully.")
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while filling the login form: {e}")
+            return False
+
+    def submit_form(self) -> bool:
+        """Submits the form using coordinates."""
+        try:
+            pyautogui.leftClick(325, 727)
+            time.sleep(10)
+            rp.debug("Form submitted successfully.")
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while submitting the form: {e}")
+            return False
+
+    def perform_search(self) -> bool:
+        """Performs a search on GeForce Now."""
+        try:
+            pyautogui.leftClick(1886, 15)  # closes the login window
+            time.sleep(7)
+            if not self.click_image("search_button"):
+                return False
+            time.sleep(4)
+            pyautogui.write("ghostrunner 2 demo")
+            time.sleep(2)
+            pyautogui.leftClick(224, 341)
+            rp.debug("Search performed successfully.")
+
+            time.sleep(80)
+            self.press_enter_multiple_times(3, 2)
+            time.sleep(30)
+            self.hold_space_key(7)
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred during the search operation: {e}")
+            return False
+
+    def focus_game_window(self) -> bool:
+        """Focuses on the game window."""
+        try:
+            pyautogui.click(x=386, y=911)
+            time.sleep(5)
+            pyautogui.click(x=386, y=911)
+            rp.debug("Game window focused.")
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while focusing the game window: {e}")
+            return False
+
+    def press_enter_multiple_times(self, times: int, interval: int) -> bool:
+        """Presses the enter key the specified number of times with a set interval."""
+        try:
+            self.focus_game_window()
+            for _ in range(times):
+                pydirectinput.press('enter')
+                rp.debug("Enter key pressed.")
+                time.sleep(interval)
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while pressing the enter key: {e}")
+            return False
+
+    def hold_space_key(self, duration: int) -> bool:
+        """Holds the Space key down for the specified duration."""
+        try:
+            self.focus_game_window()
+            pydirectinput.keyDown('space')
+            time.sleep(duration)
+            pydirectinput.keyUp('space')
+            rp.debug("Space key pressed and released.")
+            return True
+        except Exception as e:
+            rp.debug(f"Error occurred while holding the space key: {e}")
+            return False
+
+    def press_wasd_multiple_times(self) -> bool:
+        """Presses the W, A, S, D keys in sequence for the play duration and stops traffic afterwards."""
+        try:
+            self.focus_game_window()
+            end_time = time.time() + (self.play_duration * 60)
+            while time.time() < end_time:
+                pydirectinput.press('w')
+                pydirectinput.press('a')
+                pydirectinput.press('s')
+                pydirectinput.press('d')
+                rp.debug("W, A, S, D keys pressed in sequence.")
+                time.sleep(1)
+
+            rp.debug("Key press time has expired, traffic will be stopped.")
+            return self.stop_traffic()
+
+        except Exception as e:
+            rp.debug(f"Error occurred while pressing W, A, S, D keys: {e}")
+            return False
+
+    def close_geforce_now(self) -> bool:
+        """Closes the GeForce Now application."""
+        try:
+            if self.pid is not None:
+                rp.debug(f"Closing application: PID {self.pid}")
+                os.kill(self.pid, signal.SIGTERM)
+                rp.debug("Application closed successfully.")
+                return True
+            else:
+                rp.debug(
+                    "PID not found. Application might not have started correctly.")
+                return False
+        except Exception as e:
+            rp.debug(f"Error occurred while closing the application: {e}")
+            return False
+
+
+try:
+    setup = Setup()
+    app = GeForceNowApp(setup)
+
+    play_duration = int(input("How many minutes do you want to play? "))
+
+    if app.start_traffic(play_duration=play_duration):
+        rp.debug("Traffic generation started successfully.")
+
+except Exception as e:
+    rp.debug(f"Error occurred in the main process flow: {e}")
