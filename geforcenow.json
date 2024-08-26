@@ -1,0 +1,8 @@
+{
+    "images": {
+        "geforce_now": { "path": "./GeForceNow.png","type": "image/png" },
+        "join_button": { "path": "./join_button.png","type": "image/png" },
+        "search_button": { "path": "./search_button.png", "type": "image/png"
+        }
+    }
+}
