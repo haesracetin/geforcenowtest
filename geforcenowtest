@@ -1,0 +1,79 @@
+"""GeForceNowApp Traffic Detection Test."""
+import traceback
+import time
+from tee.brew import runner
+import tee.brew.test_execution as te
+from tee.brew.test_attributes import TestCategory, TestPriority, TargetedSetupType
+from tee.framework.helpers.traffic_generation.geforce import GeForceNowApp
+from tee.framework.core import reporting
+
+reporting.debug_on_terminal = True
+
+TEST_ATTRIBUTES = {
+    "test_category": TestCategory.FUNCTIONAL,
+    "tested_feature": "GeForceNow Traffic",
+    "test_priority": TestPriority.HIGH,
+    "targeted_setup_type": TargetedSetupType.ALL,
+    "jira_test_key": "",
+    "tested_repository": None
+}
+
+
+@runner.runnable
+def test(ee: te.TestExecution = None, **kwargs) -> bool:
+    """Starting GeForce Now traffic and then gaming activity check.
+
+    Args:
+        ee (te.TestExecution, optional): Execution Environment. Defaults to None.
+
+    Returns:
+        bool: Result of test.
+    """
+    result_list = []
+    reporter = ee.reporter
+    geforce = GeForceNowApp(ee.setup)
+
+    reporter.log(
+        f"Jira Execution: https://jira.airties.com/browse/{ee.jira.test_key}")
+    reporter.log("Starting GeForce Now traffic...")
+
+    try:
+        play_duration = kwargs.get("play_duration", 10)
+        reporter.log(f"Attempting to start traffic generation for {
+                     play_duration} minutes.")
+
+        if geforce.start_traffic(play_duration=play_duration):
+            reporter.success("GeForce Now traffic started successfully.")
+            result_list.append(True)
+        else:
+            reporter.failure("Failed to start GeForce Now traffic.")
+            result_list.append(False)
+
+        stop_success = geforce.stop_traffic()
+        if stop_success:
+            reporter.success("GeForce Now traffic stopped successfully.")
+        else:
+            reporter.failure("Failed to stop GeForce Now traffic.")
+            result_list.append(False)
+
+    except Exception as exc:
+        ee.FAIL()
+        reporter.log(
+            f"Exception occurred. Test Failed. Exception message: {exc}")
+        reporter.log(traceback.format_exc())
+        geforce.stop_traffic()
+        result_list.append(False)
+
+    reporter.log("Stops DPI daemons in the background")
+    if not result_list:
+        result = False
+    else:
+        result = all(result_list)
+    _ = ee.PASS() if result else ee.FAIL()
+    reporter.log(
+        f"GeForce Now ended, DPI dump active output check result is {result} ")
+    return result
+
+
+if __name__ == '__main__':
+    test(play_duration=int(input("How many minutes do you want to play? ")))
